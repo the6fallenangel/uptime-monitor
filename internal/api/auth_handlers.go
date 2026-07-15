@@ -18,8 +18,21 @@ type signupRequest struct {
 	Password string `json:"password"`
 }
 
+func isAuthenticated(r *http.Request, issuer *auth.TokenIssuer) bool {
+	cookie, err := r.Cookie(cookieName)
+	if err != nil {
+		return false
+	}
+	_, err = issuer.Verify(cookie.Value)
+	return err == nil
+}
+
 func handleSignup(store storage.Storage, issuer *auth.TokenIssuer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if isAuthenticated(r, issuer) {
+			writeError(w, http.StatusConflict, errString("already logged in"))
+			return
+		}
 		var req signupRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeError(w, http.StatusBadRequest, err)
@@ -55,6 +68,10 @@ type loginRequest struct {
 
 func handleLogin(store storage.Storage, issuer *auth.TokenIssuer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if isAuthenticated(r, issuer) {
+			writeError(w, http.StatusConflict, errString("already logged in"))
+			return
+		}
 		var req loginRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeError(w, http.StatusBadRequest, err)
