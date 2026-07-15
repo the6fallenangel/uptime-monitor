@@ -16,7 +16,10 @@ type Scheduler struct {
 	checker     *checker.Checker
 	workerCount int
 	jobs        chan models.Monitor
+	rootCtx     context.Context
 	wg          sync.WaitGroup
+	mu          sync.Mutex
+	cancels     map[int64]context.CancelFunc
 }
 
 func New(store storage.Storage, chk *checker.Checker, workerCount int) *Scheduler {
@@ -25,24 +28,50 @@ func New(store storage.Storage, chk *checker.Checker, workerCount int) *Schedule
 		checker:     chk,
 		workerCount: workerCount,
 		jobs:        make(chan models.Monitor),
+		cancels:     make(map[int64]context.CancelFunc),
 	}
 }
 
 func (s *Scheduler) Run(ctx context.Context, monitors []models.Monitor) {
+	s.rootCtx = ctx
+
 	for i := 0; i < s.workerCount; i++ {
 		s.wg.Add(1)
 		go s.worker(ctx)
 	}
 
 	for _, m := range monitors {
-		s.wg.Add(1)
-		go s.scheduleMonitor(ctx, m)
+		s.Add(m)
 	}
 
 	<-ctx.Done()
 	slog.Info("scheduler shutting down, waiting for in-flight checks")
 	s.wg.Wait()
 	slog.Info("scheduler stopped cleanly")
+}
+
+func (s *Scheduler) Add(monitor models.Monitor) {
+	monitorCtx, cancel := context.WithCancel(s.rootCtx)
+
+	s.mu.Lock()
+	s.cancels[monitor.ID] = cancel
+	s.mu.Unlock()
+
+	s.wg.Add(1)
+	go s.scheduleMonitor(monitorCtx, monitor)
+}
+
+func (s *Scheduler) Remove(monitorID int64) {
+	s.mu.Lock()
+	cancel, ok := s.cancels[monitorID]
+	if ok {
+		delete(s.cancels, monitorID)
+	}
+	s.mu.Unlock()
+
+	if ok {
+		cancel()
+	}
 }
 
 func (s *Scheduler) worker(ctx context.Context) {

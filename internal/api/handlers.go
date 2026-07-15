@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/the6fallenangel/uptime-monitor/internal/models"
+	"github.com/the6fallenangel/uptime-monitor/internal/scheduler"
 	"github.com/the6fallenangel/uptime-monitor/internal/storage"
 )
 
@@ -16,7 +17,7 @@ type createMonitorRequest struct {
 	Interval string `json:"interval"`
 }
 
-func handleCreateMonitor(store storage.Storage) http.HandlerFunc {
+func handleCreateMonitor(store storage.Storage, sched *scheduler.Scheduler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req createMonitorRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -42,6 +43,9 @@ func handleCreateMonitor(store storage.Storage) http.HandlerFunc {
 			writeError(w, http.StatusInternalServerError, err)
 			return
 		}
+
+		sched.Add(saved)
+
 		writeJSON(w, http.StatusCreated, saved)
 	}
 }
@@ -74,7 +78,7 @@ func handleGetMonitor(store storage.Storage) http.HandlerFunc {
 	}
 }
 
-func handleDeleteMonitor(store storage.Storage) http.HandlerFunc {
+func handleDeleteMonitor(store storage.Storage, sched *scheduler.Scheduler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 		if err != nil {
@@ -86,6 +90,9 @@ func handleDeleteMonitor(store storage.Storage) http.HandlerFunc {
 			writeError(w, http.StatusNotFound, err)
 			return
 		}
+
+		sched.Remove(id)
+
 		w.WriteHeader(http.StatusNoContent)
 	}
 }

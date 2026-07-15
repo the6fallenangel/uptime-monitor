@@ -40,7 +40,7 @@ func main() {
 	go sched.Run(ctx, monitors)
 
 	mux := http.NewServeMux()
-	api.RegisterRoutes(mux, store)
+	api.RegisterRoutes(mux, store, sched)
 
 	server := &http.Server{
 		Addr:    ":" + cfg.Port,
