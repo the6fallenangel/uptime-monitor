@@ -10,10 +10,10 @@ const (
 )
 
 type Check struct {
-	ID           int
-	MonitorID    int
+	ID           int64
+	MonitorID    int64
 	Status       CheckStatus
-	StatusCode   int
+	StatusCode   *int
 	ResponseTime time.Duration
 	Error        string
 	CheckedAt    time.Time

@@ -44,7 +44,8 @@ func (c *Checker) Check(ctx context.Context, monitor models.Monitor) models.Chec
 	}
 	defer resp.Body.Close()
 
-	check.StatusCode = resp.StatusCode
+	statusCode := resp.StatusCode
+	check.StatusCode = &statusCode
 
 	if resp.StatusCode >= 200 && resp.StatusCode < 400 {
 		check.Status = models.StatusUp

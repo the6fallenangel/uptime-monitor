@@ -3,7 +3,7 @@ package models
 import "time"
 
 type Monitor struct {
-	ID        int
+	ID        int64
 	Name      string
 	URL       string
 	Interval  time.Duration
