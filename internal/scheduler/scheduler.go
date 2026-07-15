@@ -42,7 +42,7 @@ func (s *Scheduler) Run(ctx context.Context, monitors []models.Monitor) {
 	<-ctx.Done()
 	slog.Info("scheduler shutting down, waiting for in-flight checks")
 	s.wg.Wait()
-	slog.Info("sheduler stopped cleanly")
+	slog.Info("scheduler stopped cleanly")
 }
 
 func (s *Scheduler) worker(ctx context.Context) {

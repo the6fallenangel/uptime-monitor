@@ -30,6 +30,7 @@ func (c *Checker) Check(ctx context.Context, monitor models.Monitor) models.Chec
 	if err != nil {
 		check.Status = models.StatusDown
 		check.Error = err.Error()
+		check.CheckedAt = time.Now()
 		return check
 	}
 
@@ -40,6 +41,7 @@ func (c *Checker) Check(ctx context.Context, monitor models.Monitor) models.Chec
 	if err != nil {
 		check.Status = models.StatusDown
 		check.Error = err.Error()
+		check.CheckedAt = time.Now()
 		return check
 	}
 	defer resp.Body.Close()
@@ -53,5 +55,6 @@ func (c *Checker) Check(ctx context.Context, monitor models.Monitor) models.Chec
 		check.Status = models.StatusDown
 	}
 
+	check.CheckedAt = time.Now()
 	return check
 }
