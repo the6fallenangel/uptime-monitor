@@ -36,8 +36,17 @@ func (s *PostgresStorage) Close() {
 
 func migrate(ctx context.Context, pool *pgxpool.Pool) error {
 	const schema = `
+	CREATE TABLE IF NOT EXISTS users (
+		id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+		name TEXT NOT NULL,
+		email TEXT NOT NULL UNIQUE,
+		password_hash TEXT NOT NULL,
+		created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+	);
+
 	CREATE TABLE IF NOT EXISTS monitors (
 		id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+		user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 		name TEXT NOT NULL,
 		url TEXT NOT NULL,
 		interval_seconds INTEGER NOT NULL,
@@ -54,6 +63,7 @@ func migrate(ctx context.Context, pool *pgxpool.Pool) error {
 		checked_at TIMESTAMPTZ NOT NULL
 	);
 
+	CREATE INDEX IF NOT EXISTS idx_monitors_user_id ON monitors(user_id);
 	CREATE INDEX IF NOT EXISTS idx_checks_monitor_id ON checks(monitor_id);
 	CREATE INDEX IF NOT EXISTS idx_checks_monitor_time ON checks(monitor_id, checked_at DESC);`
 
@@ -61,12 +71,31 @@ func migrate(ctx context.Context, pool *pgxpool.Pool) error {
 	return err
 }
 
+func (s *PostgresStorage) CreateUser(ctx context.Context, u models.User) (models.User, error) {
+	row := s.pool.QueryRow(ctx,
+		`INSERT INTO users (name, email, password_hash) VALUES ($1, $2, $3) RETURNING id, created_at`, u.Name, u.Email, u.PasswordHash)
+	if err := row.Scan(&u.ID, &u.CreatedAt); err != nil {
+		return models.User{}, fmt.Errorf("inserting user: %w", err)
+	}
+	return u, nil
+}
+
+func (s *PostgresStorage) GetUserByEmail(ctx context.Context, email string) (models.User, error) {
+	var u models.User
+	row := s.pool.QueryRow(ctx, `SELECT id, name, email, password_hash, created_at FROM users WHERE email = $1`, email)
+
+	if err := row.Scan(&u.ID, &u.Name, &u.Email, &u.PasswordHash, &u.CreatedAt); err != nil {
+		return models.User{}, fmt.Errorf("user not found: %w", err)
+	}
+	return u, nil
+}
+
 func (s *PostgresStorage) CreateMonitor(ctx context.Context, m models.Monitor) (models.Monitor, error) {
 	row := s.pool.QueryRow(ctx,
-		`INSERT INTO monitors (name, url, interval_seconds)
-		 VALUES ($1, $2, $3)
+		`INSERT INTO monitors (user_id, name, url, interval_seconds)
+		 VALUES ($1, $2, $3, $4)
 		 RETURNING id, created_at`,
-		m.Name, m.URL, int(m.Interval.Seconds()),
+		m.UserID, m.Name, m.URL, int(m.Interval.Seconds()),
 	)
 	if err := row.Scan(&m.ID, &m.CreatedAt); err != nil {
 		return models.Monitor{}, fmt.Errorf("inserting monitor: %w", err)
@@ -74,9 +103,19 @@ func (s *PostgresStorage) CreateMonitor(ctx context.Context, m models.Monitor) (
 	return m, nil
 }
 
-func (s *PostgresStorage) ListMonitors(ctx context.Context) ([]models.Monitor, error) {
+func (s *PostgresStorage) ListMonitorsForUser(ctx context.Context, userID int64) ([]models.Monitor, error) {
+	return s.queryMonitors(ctx, "WHERE user_id = $1 ORDER BY id", userID)
+}
+
+func (s *PostgresStorage) ListAllMonitors(ctx context.Context) ([]models.Monitor, error) {
+	return s.queryMonitors(ctx, "ORDER BY id")
+}
+
+func (s *PostgresStorage) queryMonitors(ctx context.Context, whereOrderClause string, args ...any) ([]models.Monitor, error) {
 	rows, err := s.pool.Query(ctx,
-		`SELECT id, name, url, interval_seconds, created_at FROM monitors ORDER BY id`)
+		`SELECT id, user_id, name, url, interval_seconds, created_at FROM monitors `+whereOrderClause,
+		args...,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("querying monitors: %w", err)
 	}
@@ -87,7 +126,7 @@ func (s *PostgresStorage) ListMonitors(ctx context.Context) ([]models.Monitor, e
 		var m models.Monitor
 		var intervalSeconds int
 
-		if err := rows.Scan(&m.ID, &m.Name, &m.URL, &intervalSeconds, &m.CreatedAt); err != nil {
+		if err := rows.Scan(&m.ID, &m.UserID, &m.Name, &m.URL, &intervalSeconds, &m.CreatedAt); err != nil {
 			return nil, fmt.Errorf("scanning monitor row: %w", err)
 		}
 		m.Interval = time.Duration(intervalSeconds) * time.Second
@@ -100,27 +139,27 @@ func (s *PostgresStorage) ListMonitors(ctx context.Context) ([]models.Monitor, e
 	return monitors, nil
 }
 
-func (s *PostgresStorage) GetMonitor(ctx context.Context, id int64) (models.Monitor, error) {
+func (s *PostgresStorage) GetMonitorForUser(ctx context.Context, id, userID int64) (models.Monitor, error) {
 	var m models.Monitor
 	var intervalSeconds int
 
 	row := s.pool.QueryRow(ctx,
-		`SELECT id, name, url, interval_seconds, created_at FROM monitors WHERE id = $1`, id)
+		`SELECT id, user_id, name, url, interval_seconds, created_at FROM monitors WHERE id = $1 AND user_id = $2`, id, userID)
 
-	if err := row.Scan(&m.ID, &m.Name, &m.URL, &intervalSeconds, &m.CreatedAt); err != nil {
-		return models.Monitor{}, fmt.Errorf("monitor with id %d not found: %w", id, err)
+	if err := row.Scan(&m.ID, &m.UserID, &m.Name, &m.URL, &intervalSeconds, &m.CreatedAt); err != nil {
+		return models.Monitor{}, fmt.Errorf("monitor not found: %w", err)
 	}
 	m.Interval = time.Duration(intervalSeconds) * time.Second
 	return m, nil
 }
 
-func (s *PostgresStorage) DeleteMonitor(ctx context.Context, id int64) error {
-	tag, err := s.pool.Exec(ctx, `DELETE FROM monitors WHERE id = $1`, id)
+func (s *PostgresStorage) DeleteMonitorForUser(ctx context.Context, id, userID int64) error {
+	tag, err := s.pool.Exec(ctx, `DELETE FROM monitors WHERE id = $1 AND user_id = $2`, id, userID)
 	if err != nil {
 		return fmt.Errorf("deleting monitor: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
-		return fmt.Errorf("monitor with id %d not found", id)
+		return fmt.Errorf("monitor not found")
 	}
 	return nil
 }

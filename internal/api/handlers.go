@@ -19,6 +19,12 @@ type createMonitorRequest struct {
 
 func handleCreateMonitor(store storage.Storage, sched *scheduler.Scheduler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := userIDFromContext(r.Context())
+		if !ok {
+			writeError(w, http.StatusUnauthorized, errString("not authenticated"))
+			return
+		}
+
 		var req createMonitorRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeError(w, http.StatusBadRequest, err)
@@ -36,7 +42,7 @@ func handleCreateMonitor(store storage.Storage, sched *scheduler.Scheduler) http
 			return
 		}
 
-		monitor := models.NewMonitor(req.Name, req.URL, interval)
+		monitor := models.NewMonitor(userID, req.Name, req.URL, interval)
 
 		saved, err := store.CreateMonitor(r.Context(), monitor)
 		if err != nil {
@@ -50,9 +56,15 @@ func handleCreateMonitor(store storage.Storage, sched *scheduler.Scheduler) http
 	}
 }
 
-func handleListMonitors(store storage.Storage) http.HandlerFunc {
+func handleListMonitorsForUser(store storage.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		monitors, err := store.ListMonitors(r.Context())
+		userID, ok := userIDFromContext(r.Context())
+		if !ok {
+			writeError(w, http.StatusUnauthorized, errString("not authenticated"))
+			return
+		}
+
+		monitors, err := store.ListMonitorsForUser(r.Context(), userID)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, err)
 			return
@@ -61,15 +73,21 @@ func handleListMonitors(store storage.Storage) http.HandlerFunc {
 	}
 }
 
-func handleGetMonitor(store storage.Storage) http.HandlerFunc {
+func handleGetMonitorForUser(store storage.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := userIDFromContext(r.Context())
+		if !ok {
+			writeError(w, http.StatusUnauthorized, errString("not authenticated"))
+			return
+		}
+
 		id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 		if err != nil {
 			writeError(w, http.StatusBadRequest, errString("invalid monitor id"))
 			return
 		}
 
-		monitor, err := store.GetMonitor(r.Context(), id)
+		monitor, err := store.GetMonitorForUser(r.Context(), id, userID)
 		if err != nil {
 			writeError(w, http.StatusNotFound, err)
 			return
@@ -78,15 +96,21 @@ func handleGetMonitor(store storage.Storage) http.HandlerFunc {
 	}
 }
 
-func handleDeleteMonitor(store storage.Storage, sched *scheduler.Scheduler) http.HandlerFunc {
+func handleDeleteMonitorForUser(store storage.Storage, sched *scheduler.Scheduler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := userIDFromContext(r.Context())
+		if !ok {
+			writeError(w, http.StatusUnauthorized, errString("not authenticated"))
+			return
+		}
+
 		id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 		if err != nil {
 			writeError(w, http.StatusBadRequest, errString("invalid monitor id"))
 			return
 		}
 
-		if err := store.DeleteMonitor(r.Context(), id); err != nil {
+		if err := store.DeleteMonitorForUser(r.Context(), id, userID); err != nil {
 			writeError(w, http.StatusNotFound, err)
 			return
 		}
@@ -99,9 +123,20 @@ func handleDeleteMonitor(store storage.Storage, sched *scheduler.Scheduler) http
 
 func handleListChecks(store storage.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := userIDFromContext(r.Context())
+		if !ok {
+			writeError(w, http.StatusUnauthorized, errString("not authenticated"))
+			return
+		}
+
 		id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 		if err != nil {
 			writeError(w, http.StatusBadRequest, errString("invalid monitor id"))
+			return
+		}
+
+		if _, err := store.GetMonitorForUser(r.Context(), id, userID); err != nil {
+			writeError(w, http.StatusNotFound, err)
 			return
 		}
 

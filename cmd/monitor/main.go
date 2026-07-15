@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/the6fallenangel/uptime-monitor/internal/api"
+	"github.com/the6fallenangel/uptime-monitor/internal/auth"
 	"github.com/the6fallenangel/uptime-monitor/internal/checker"
 	"github.com/the6fallenangel/uptime-monitor/internal/config"
 	"github.com/the6fallenangel/uptime-monitor/internal/scheduler"
@@ -30,7 +31,7 @@ func main() {
 	}
 	defer store.Close()
 
-	monitors, err := store.ListMonitors(ctx)
+	monitors, err := store.ListAllMonitors(ctx)
 	if err != nil {
 		log.Fatal("error loading monitors:", err)
 	}
@@ -39,8 +40,10 @@ func main() {
 	sched := scheduler.New(store, chk, 10)
 	go sched.Run(ctx, monitors)
 
+	issuer := auth.NewTokenIssuer(cfg.JWTSecret, 7*24*time.Hour)
+
 	mux := http.NewServeMux()
-	api.RegisterRoutes(mux, store, sched)
+	api.RegisterRoutes(mux, store, sched, issuer)
 
 	server := &http.Server{
 		Addr:    ":" + cfg.Port,
