@@ -15,6 +15,7 @@ import (
 	"github.com/the6fallenangel/uptime-monitor/internal/auth"
 	"github.com/the6fallenangel/uptime-monitor/internal/checker"
 	"github.com/the6fallenangel/uptime-monitor/internal/config"
+	"github.com/the6fallenangel/uptime-monitor/internal/notifier"
 	"github.com/the6fallenangel/uptime-monitor/internal/scheduler"
 	"github.com/the6fallenangel/uptime-monitor/internal/storage"
 )
@@ -37,7 +38,8 @@ func main() {
 	}
 
 	chk := checker.New(10 * time.Second)
-	sched := scheduler.New(store, chk, 10)
+	notif := notifier.NewLogNotifier()
+	sched := scheduler.New(store, chk, notif, 10)
 	go sched.Run(ctx, monitors)
 
 	issuer := auth.NewTokenIssuer(cfg.JWTSecret, 7*24*time.Hour)

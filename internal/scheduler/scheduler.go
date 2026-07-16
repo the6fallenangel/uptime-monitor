@@ -8,27 +8,33 @@ import (
 
 	"github.com/the6fallenangel/uptime-monitor/internal/checker"
 	"github.com/the6fallenangel/uptime-monitor/internal/models"
+	"github.com/the6fallenangel/uptime-monitor/internal/notifier"
 	"github.com/the6fallenangel/uptime-monitor/internal/storage"
 )
 
 type Scheduler struct {
 	store       storage.Storage
 	checker     *checker.Checker
+	notifier    notifier.Notifier
 	workerCount int
 	jobs        chan models.Monitor
 	rootCtx     context.Context
 	wg          sync.WaitGroup
 	mu          sync.Mutex
 	cancels     map[int64]context.CancelFunc
+	statusMu    sync.Mutex
+	lastStatus  map[int64]models.CheckStatus
 }
 
-func New(store storage.Storage, chk *checker.Checker, workerCount int) *Scheduler {
+func New(store storage.Storage, chk *checker.Checker, notif notifier.Notifier, workerCount int) *Scheduler {
 	return &Scheduler{
 		store:       store,
 		checker:     chk,
+		notifier:    notif,
 		workerCount: workerCount,
 		jobs:        make(chan models.Monitor),
 		cancels:     make(map[int64]context.CancelFunc),
+		lastStatus:  make(map[int64]models.CheckStatus),
 	}
 }
 
@@ -128,4 +134,31 @@ func (s *Scheduler) runCheck(ctx context.Context, monitor models.Monitor) {
 		"status", check.Status,
 		"response_time", check.ResponseTime,
 	)
+
+	s.detectAndNotifyTransition(ctx, monitor, check)
+}
+
+func (s *Scheduler) detectAndNotifyTransition(ctx context.Context, monitor models.Monitor, check models.Check) {
+	s.statusMu.Lock()
+	previous, seenBefore := s.lastStatus[monitor.ID]
+	s.lastStatus[monitor.ID] = check.Status
+	s.statusMu.Unlock()
+
+	if !seenBefore || previous == check.Status {
+		return
+	}
+
+	event := notifier.Event{
+		Monitor:        monitor,
+		PreviousStatus: previous,
+		NewStatus:      check.Status,
+		Check:          check,
+	}
+
+	if err := s.notifier.Notify(ctx, event); err != nil {
+		slog.Error("failed to send notification",
+			"monitor_id", monitor.ID,
+			"error", err,
+		)
+	}
 }
