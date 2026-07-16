@@ -3,17 +3,20 @@
 ![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go)
 ![CI](https://github.com/the6fallenangel/uptime-monitor/actions/workflows/ci.yml/badge.svg)
 
-A concurrent website/API uptime monitoring service written in Go.
+A concurrent, multi-user website/API uptime monitoring service written in Go.
 
-Register URLs to monitor at user-defined intervals; a worker-pool scheduler checks them concurrently, records status and response times, and exposes everything over a REST API.
+Users register URLs to monitor at their own configured intervals; a worker-pool scheduler checks them concurrently, records status and response times, and sends an alert when a monitor's status changes.
 
 ## Features
 
-- **Per-monitor, user-configurable check intervals** (`"30s"`, `"5m"`, etc.) — not hardcoded
-- **Concurrent checking via a bounded worker pool**, so many monitors ticking at once doesn't mean unbounded simultaneous network requests
+- **User accounts** — signup/login with bcrypt password hashing and JWT-based sessions delivered via httpOnly cookies
+- **Per-user data isolation** — every monitor is scoped to its owner; ownership is enforced at the storage layer, not just the API
+- **Per-monitor, user-configurable check intervals** (`"30s"`, `"5m"`, etc.)
+- **Concurrent checking via a bounded worker pool** — many monitors ticking at once doesn't mean unbounded simultaneous network requests
 - **Dynamic registration** — monitors added or removed via the API take effect immediately, no restart required
+- **Status-change alerting** via a pluggable `Notifier` interface — structured logs and email (SMTP) implementations included
 - **Postgres-backed persistence** with cascading deletes and indexed check history
-- **REST API**: create/list/delete monitors, view check history, filter by result count
+- **REST API**: signup/login/logout, create/list/delete monitors, view check history
 - Graceful shutdown — in-flight checks and HTTP requests finish cleanly on exit
 - Tests run against a real Postgres instance, each isolated in its own schema
 - CI via GitHub Actions, including a Postgres service container
@@ -22,13 +25,15 @@ Register URLs to monitor at user-defined intervals; a worker-pool scheduler chec
 
 ```
 cmd/
-  monitor/         entry point — wires config, storage, scheduler, and API together
+  monitor/         entry point — wires config, storage, scheduler, notifier, and API together
 internal/
-  models/          Monitor and Check domain types
+  models/          User, Monitor, and Check domain types
+  auth/            JWT issuing and verification
   checker/         performs a single HTTP check against a monitor
-  scheduler/       worker pool + per-monitor ticking, with dynamic add/remove
-  storage/         Postgres persistence layer
-  api/             REST API handlers and routes
+  scheduler/       worker pool, per-monitor ticking, dynamic add/remove, status-transition detection
+  notifier/        Notifier interface + log and email implementations
+  storage/         Postgres persistence layer, all monitor queries scoped by owner
+  api/             REST API handlers, routes, and auth middleware
   config/          .env configuration loading
 ```
 
@@ -37,10 +42,16 @@ internal/
 ```
 monitor A ──ticker──┐
 monitor B ──ticker──┼──▶ [ jobs channel ] ──▶ worker pool ──▶ storage
-monitor C ──ticker──┘
+monitor C ──ticker──┘                              │
+                                                                      ▼
+                                          status changed? ──▶ Notifier
 ```
 
-Each monitor runs its own ticker at its configured interval; ticks are handed off to a fixed pool of worker goroutines that perform the actual HTTP check and persist the result. This decouples "how many monitors exist" from "how much concurrent network traffic is generated" — 500 monitors ticking at once doesn't mean 500 simultaneous requests.
+Each monitor runs its own ticker at its configured interval; ticks are handed to a fixed pool of worker goroutines that perform the check, persist the result, and compare it against the monitor's last known status. A notification only fires on an actual transition (e.g. up → down), not on every routine check.
+
+## Authentication
+
+Sessions are JWTs stored in httpOnly cookies — never exposed to client-side JavaScript, mitigating token theft via XSS. All monitor and check endpoints require a valid session and are scoped to the authenticated user; every storage query filters by owner, so one user can never read or modify another's data by guessing an ID.
 
 ## Usage
 
@@ -59,7 +70,16 @@ cp .env.example .env
 ```env
 DATABASE_URL=postgres://postgres:password@localhost:5432/uptime_monitor?sslmode=disable
 PORT=8080
+JWT_SECRET=the6fallenangels-says-you-should-change-this
+
+SMTP_HOST=
+SMTP_PORT=
+SMTP_USER=
+SMTP_PASS=
+ALERT_FROM=
 ```
+
+If SMTP settings are left blank, status-change alerts fall back to structured log output instead of email.
 
 ### Run
 
@@ -70,13 +90,17 @@ go run ./cmd/monitor
 ### API
 
 ```bash
-curl -X POST localhost:8080/monitors \
+curl -c cookies.txt -X POST localhost:8080/signup \
+  -d '{"name":"Ali","email":"ali@example.com","password":"supersecret123"}'
+
+curl -b cookies.txt -X POST localhost:8080/monitors \
   -d '{"name":"Example","url":"https://example.com","interval":"30s"}'
 
-curl localhost:8080/monitors
-curl localhost:8080/monitors/1
-curl localhost:8080/monitors/1/checks
-curl -X DELETE localhost:8080/monitors/1
+curl -b cookies.txt localhost:8080/monitors
+curl -b cookies.txt localhost:8080/monitors/1
+curl -b cookies.txt localhost:8080/monitors/1/checks
+curl -b cookies.txt -X DELETE localhost:8080/monitors/1
+curl -b cookies.txt -X POST localhost:8080/logout
 ```
 
 ## Testing
@@ -86,8 +110,8 @@ docker compose up -d
 go test ./... -v
 ```
 
-Each test run gets its own Postgres schema, created and dropped automatically, so tests never interfere with each other or with real data.
+Each test run gets its own Postgres schema, created and dropped automatically. Storage tests cover both standard CRUD and cross-user isolation (confirming one user cannot read, list, or delete another user's monitors).
 
 ## Status
 
-Core functionality — scheduling, concurrent checking, persistence, REST API, dynamic monitor management — is complete and tested. Built primarily to work with Go's concurrency primitives (goroutines, channels, worker pools, context cancellation) in a genuinely useful context rather than a toy exercise.
+Core functionality is complete: multi-user auth, ownership-scoped storage, concurrent scheduling, persistence, alerting, and a REST API. A frontend and additional hardening (CORS, expanded test coverage for auth/notifier packages) are planned next.
