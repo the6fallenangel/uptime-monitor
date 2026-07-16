@@ -8,6 +8,7 @@ import (
 
 type Event struct {
 	Monitor        models.Monitor
+	OwnerEmail     string
 	PreviousStatus models.CheckStatus
 	NewStatus      models.CheckStatus
 	Check          models.Check

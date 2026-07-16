@@ -148,8 +148,19 @@ func (s *Scheduler) detectAndNotifyTransition(ctx context.Context, monitor model
 		return
 	}
 
+	owner, err := s.store.GetUserByID(ctx, monitor.UserID)
+	if err != nil {
+		slog.Error("failed to look up monitor owner for notification",
+			"monitor_id", monitor.ID,
+			"user_id", monitor.UserID,
+			"error", err,
+		)
+		return
+	}
+
 	event := notifier.Event{
 		Monitor:        monitor,
+		OwnerEmail:     owner.Email,
 		PreviousStatus: previous,
 		NewStatus:      check.Status,
 		Check:          check,

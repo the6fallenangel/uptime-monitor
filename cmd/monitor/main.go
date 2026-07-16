@@ -37,8 +37,14 @@ func main() {
 		log.Fatal("error loading monitors:", err)
 	}
 
+	var notif notifier.Notifier
+	if cfg.SMTPHost != "" {
+		notif = notifier.NewEmailNotifier(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUser, cfg.SMTPPass, cfg.AlertFrom)
+	} else {
+		notif = notifier.NewLogNotifier()
+	}
+
 	chk := checker.New(10 * time.Second)
-	notif := notifier.NewLogNotifier()
 	sched := scheduler.New(store, chk, notif, 10)
 	go sched.Run(ctx, monitors)
 

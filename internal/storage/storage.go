@@ -9,6 +9,7 @@ import (
 type Storage interface {
 	CreateUser(ctx context.Context, user models.User) (models.User, error)
 	GetUserByEmail(ctx context.Context, email string) (models.User, error)
+	GetUserByID(ctx context.Context, id int64) (models.User, error)
 
 	CreateMonitor(ctx context.Context, monitor models.Monitor) (models.Monitor, error)
 	ListMonitorsForUser(ctx context.Context, userID int64) ([]models.Monitor, error)

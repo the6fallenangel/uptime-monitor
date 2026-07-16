@@ -90,6 +90,18 @@ func (s *PostgresStorage) GetUserByEmail(ctx context.Context, email string) (mod
 	return u, nil
 }
 
+func (s *PostgresStorage) GetUserByID(ctx context.Context, id int64) (models.User, error) {
+	var u models.User
+
+	row := s.pool.QueryRow(ctx,
+		`SELECT id, name, email, password_hash, created_at FROM users WHERE id = $1`, id)
+
+	if err := row.Scan(&u.ID, &u.Name, &u.Email, &u.PasswordHash, &u.CreatedAt); err != nil {
+		return models.User{}, fmt.Errorf("user not found: %w", err)
+	}
+	return u, nil
+}
+
 func (s *PostgresStorage) CreateMonitor(ctx context.Context, m models.Monitor) (models.Monitor, error) {
 	row := s.pool.QueryRow(ctx,
 		`INSERT INTO monitors (user_id, name, url, interval_seconds)
