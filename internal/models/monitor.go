@@ -3,12 +3,12 @@ package models
 import "time"
 
 type Monitor struct {
-	ID        int64
-	UserID    int64
-	Name      string
-	URL       string
-	Interval  time.Duration
-	CreatedAt time.Time
+	ID        int64         `json:"id"`
+	UserID    int64         `json:"userId"`
+	Name      string        `json:"name"`
+	URL       string        `json:"url"`
+	Interval  time.Duration `json:"interval"`
+	CreatedAt time.Time     `json:"createdAt"`
 }
 
 func NewMonitor(userID int64, name, url string, interval time.Duration) Monitor {

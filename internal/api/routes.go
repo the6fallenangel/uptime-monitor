@@ -12,6 +12,7 @@ func RegisterRoutes(mux *http.ServeMux, store storage.Storage, sched *scheduler.
 	mux.HandleFunc("POST /signup", handleSignup(store, issuer, isProduction))
 	mux.HandleFunc("POST /login", handleLogin(store, issuer, isProduction))
 	mux.HandleFunc("POST /logout", handleLogout)
+	mux.Handle("GET /me", requireAuth(issuer, handleMe(store, issuer)))
 
 	mux.Handle("POST /monitors", requireAuth(issuer, handleCreateMonitor(store, sched)))
 	mux.Handle("GET /monitors", requireAuth(issuer, handleListMonitorsForUser(store)))

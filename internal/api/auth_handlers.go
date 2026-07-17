@@ -88,6 +88,24 @@ func handleLogin(store storage.Storage, issuer *auth.TokenIssuer, isProduction b
 	}
 }
 
+func handleMe(store storage.Storage, issuer *auth.TokenIssuer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := userIDFromContext(r.Context())
+		if !ok {
+			writeError(w, http.StatusUnauthorized, errString("not authenticated"))
+			return
+		}
+
+		user, err := store.GetUserByID(r.Context(), userID)
+		if err != nil {
+			writeError(w, http.StatusNotFound, err)
+			return
+		}
+
+		writeJSON(w, http.StatusOK, map[string]any{"id": user.ID, "name": user.Name, "email": user.Email})
+	}
+}
+
 func handleLogout(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     cookieName,
