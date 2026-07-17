@@ -27,7 +27,7 @@ func isAuthenticated(r *http.Request, issuer *auth.TokenIssuer) bool {
 	return err == nil
 }
 
-func handleSignup(store storage.Storage, issuer *auth.TokenIssuer) http.HandlerFunc {
+func handleSignup(store storage.Storage, issuer *auth.TokenIssuer, isProduction bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if isAuthenticated(r, issuer) {
 			writeError(w, http.StatusConflict, errString("already logged in"))
@@ -56,7 +56,7 @@ func handleSignup(store storage.Storage, issuer *auth.TokenIssuer) http.HandlerF
 			return
 		}
 
-		issueSessionCookie(w, issuer, saved.ID)
+		issueSessionCookie(w, issuer, saved.ID, isProduction)
 		writeJSON(w, http.StatusCreated, map[string]any{"id": saved.ID, "name": saved.Name, "email": saved.Email})
 	}
 }
@@ -66,7 +66,7 @@ type loginRequest struct {
 	Password string `json:"password"`
 }
 
-func handleLogin(store storage.Storage, issuer *auth.TokenIssuer) http.HandlerFunc {
+func handleLogin(store storage.Storage, issuer *auth.TokenIssuer, isProduction bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if isAuthenticated(r, issuer) {
 			writeError(w, http.StatusConflict, errString("already logged in"))
@@ -83,7 +83,7 @@ func handleLogin(store storage.Storage, issuer *auth.TokenIssuer) http.HandlerFu
 			writeError(w, http.StatusUnauthorized, errString("invalid email or password"))
 			return
 		}
-		issueSessionCookie(w, issuer, user.ID)
+		issueSessionCookie(w, issuer, user.ID, isProduction)
 		writeJSON(w, http.StatusOK, map[string]any{"id": user.ID, "name": user.Name, "email": user.Email})
 	}
 }
@@ -100,7 +100,7 @@ func handleLogout(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func issueSessionCookie(w http.ResponseWriter, issuer *auth.TokenIssuer, userID int64) {
+func issueSessionCookie(w http.ResponseWriter, issuer *auth.TokenIssuer, userID int64, isProduction bool) {
 	token, err := issuer.Issue(userID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
@@ -112,7 +112,7 @@ func issueSessionCookie(w http.ResponseWriter, issuer *auth.TokenIssuer, userID 
 		Value:    token,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   true,
+		Secure:   isProduction,
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   int((7 * 24 * time.Hour).Seconds()),
 	})

@@ -8,45 +8,47 @@ import (
 )
 
 type Config struct {
-	DatabaseURL string
-	Port        string
-	JWTSecret   string
-	SMTPHost    string
-	SMTPPort    int
-	SMTPUser    string
-	SMTPPass    string
-	AlertFrom   string
+	Environment    string
+	DatabaseURL    string
+	Port           string
+	JWTSecret      string
+	FrontendOrigin string
+	SMTPHost       string
+	SMTPPort       int
+	SMTPUser       string
+	SMTPPass       string
+	AlertFrom      string
 }
 
 func Load() Config {
-	godotenv.Load()
+	_ = godotenv.Load()
 
-	cfg := Config{
-		DatabaseURL: "postgres://postgres:password@localhost:5432/uptime_monitor?sslmode=disable",
-		Port:        "8080",
-		JWTSecret:   "dev-secret-change-me",
+	return Config{
+		Environment:    getEnv("ENVIRONMENT", "development"),
+		DatabaseURL:    getEnv("DATABASE_URL", "postgres://postgres:password@localhost:5432/uptime_monitor?sslmode=disable"),
+		Port:           getEnv("PORT", "8080"),
+		JWTSecret:      getEnv("JWT_SECRET", ""),
+		FrontendOrigin: getEnv("FRONTEND_ORIGIN", "http://localhost:3000"),
+		SMTPHost:       getEnv("SMTP_HOST", ""),
+		SMTPUser:       getEnv("SMTP_USER", ""),
+		SMTPPass:       getEnv("SMTP_PASS", ""),
+		AlertFrom:      getEnv("ALERT_FROM", ""),
+		SMTPPort:       getEnvInt("SMTP_PORT", 8080),
 	}
+}
 
-	if v := os.Getenv("DATABASE_URL"); v != "" {
-		cfg.DatabaseURL = v
+func getEnv(key, fallback string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
 	}
-	if v := os.Getenv("PORT"); v != "" {
-		cfg.Port = v
+	return fallback
+}
+
+func getEnvInt(key string, fallback int) int {
+	if value := os.Getenv(key); value != "" {
+		if v, err := strconv.Atoi(value); err == nil {
+			return v
+		}
 	}
-	if v := os.Getenv("SMTP_HOST"); v != "" {
-		cfg.SMTPHost = v
-	}
-	if v := os.Getenv("SMTP_PORT"); v != "" {
-		cfg.SMTPPort, _ = strconv.Atoi(v)
-	}
-	if v := os.Getenv("SMTP_USER"); v != "" {
-		cfg.SMTPUser = v
-	}
-	if v := os.Getenv("SMTP_PASS"); v != "" {
-		cfg.SMTPPass = v
-	}
-	if v := os.Getenv("ALERT_FROM"); v != "" {
-		cfg.AlertFrom = v
-	}
-	return cfg
+	return fallback
 }

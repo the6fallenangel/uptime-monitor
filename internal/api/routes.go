@@ -8,9 +8,9 @@ import (
 	"github.com/the6fallenangel/uptime-monitor/internal/storage"
 )
 
-func RegisterRoutes(mux *http.ServeMux, store storage.Storage, sched *scheduler.Scheduler, issuer *auth.TokenIssuer) {
-	mux.HandleFunc("POST /signup", handleSignup(store, issuer))
-	mux.HandleFunc("POST /login", handleLogin(store, issuer))
+func RegisterRoutes(mux *http.ServeMux, store storage.Storage, sched *scheduler.Scheduler, issuer *auth.TokenIssuer, isProduction bool) {
+	mux.HandleFunc("POST /signup", handleSignup(store, issuer, isProduction))
+	mux.HandleFunc("POST /login", handleLogin(store, issuer, isProduction))
 	mux.HandleFunc("POST /logout", handleLogout)
 
 	mux.Handle("POST /monitors", requireAuth(issuer, handleCreateMonitor(store, sched)))

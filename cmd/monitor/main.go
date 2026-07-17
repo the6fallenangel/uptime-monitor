@@ -50,12 +50,16 @@ func main() {
 
 	issuer := auth.NewTokenIssuer(cfg.JWTSecret, 7*24*time.Hour)
 
+	isProduction := cfg.Environment == "production"
+
 	mux := http.NewServeMux()
-	api.RegisterRoutes(mux, store, sched, issuer)
+	api.RegisterRoutes(mux, store, sched, issuer, isProduction)
+
+	handler := api.CORSMiddleware(cfg.FrontendOrigin, mux)
 
 	server := &http.Server{
 		Addr:    ":" + cfg.Port,
-		Handler: mux,
+		Handler: handler,
 	}
 
 	go func() {

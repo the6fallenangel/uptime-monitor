@@ -27,7 +27,7 @@ func newTestHandler(t *testing.T) http.Handler {
 	sched.SetRootContext(context.Background())
 
 	mux := http.NewServeMux()
-	RegisterRoutes(mux, store, sched, issuer)
+	RegisterRoutes(mux, store, sched, issuer, false)
 	return mux
 }
 
