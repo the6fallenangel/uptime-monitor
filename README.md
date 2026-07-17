@@ -15,10 +15,11 @@ Users register URLs to monitor at their own configured intervals; a worker-pool 
 - **Concurrent checking via a bounded worker pool** — many monitors ticking at once doesn't mean unbounded simultaneous network requests
 - **Dynamic registration** — monitors added or removed via the API take effect immediately, no restart required
 - **Status-change alerting** via a pluggable `Notifier` interface — structured logs and email (SMTP) implementations included
+- **CORS support** with credentialed requests, ready for a separate frontend origin
 - **Postgres-backed persistence** with cascading deletes and indexed check history
 - **REST API**: signup/login/logout, create/list/delete monitors, view check history
 - Graceful shutdown — in-flight checks and HTTP requests finish cleanly on exit
-- Tests run against a real Postgres instance, each isolated in its own schema
+- Full test suite: storage (with cross-user isolation), auth, notifier, scheduler transition logic, and API handlers — each Postgres-backed test isolated in its own schema
 - CI via GitHub Actions, including a Postgres service container
 
 ## Project layout
@@ -33,7 +34,7 @@ internal/
   scheduler/       worker pool, per-monitor ticking, dynamic add/remove, status-transition detection
   notifier/        Notifier interface + log and email implementations
   storage/         Postgres persistence layer, all monitor queries scoped by owner
-  api/             REST API handlers, routes, and auth middleware
+  api/             REST API handlers, routes, auth middleware, and CORS
   config/          .env configuration loading
 ```
 
@@ -43,7 +44,7 @@ internal/
 monitor A ──ticker──┐
 monitor B ──ticker──┼──▶ [ jobs channel ] ──▶ worker pool ──▶ storage
 monitor C ──ticker──┘                              │
-                                                                      ▼
+                                                     ▼
                                           status changed? ──▶ Notifier
 ```
 
@@ -52,6 +53,8 @@ Each monitor runs its own ticker at its configured interval; ticks are handed to
 ## Authentication
 
 Sessions are JWTs stored in httpOnly cookies — never exposed to client-side JavaScript, mitigating token theft via XSS. All monitor and check endpoints require a valid session and are scoped to the authenticated user; every storage query filters by owner, so one user can never read or modify another's data by guessing an ID.
+
+The session cookie's `Secure` flag is environment-aware: disabled in development (so it works over plain HTTP with a local frontend dev server), enabled in production (HTTPS only).
 
 ## Usage
 
@@ -68,9 +71,11 @@ cp .env.example .env
 ```
 
 ```env
+ENVIRONMENT=development
 DATABASE_URL=postgres://postgres:password@localhost:5432/uptime_monitor?sslmode=disable
 PORT=8080
-JWT_SECRET=the6fallenangels-says-you-should-change-this
+JWT_SECRET=change-this-to-a-long-random-string
+FRONTEND_ORIGIN=http://localhost:3000
 
 SMTP_HOST=
 SMTP_PORT=
@@ -110,8 +115,13 @@ docker compose up -d
 go test ./... -v
 ```
 
-Each test run gets its own Postgres schema, created and dropped automatically. Storage tests cover both standard CRUD and cross-user isolation (confirming one user cannot read, list, or delete another user's monitors).
+Every Postgres-backed test runs in its own dynamically created schema, dropped automatically afterward, so tests never interfere with each other or with real data. Coverage includes:
+
+- Storage CRUD and cross-user isolation (one user cannot read, list, or delete another user's monitors)
+- JWT issuing, verification, tampering, expiry, and secret mismatches
+- Scheduler status-transition detection, using a mock notifier and a stub storage layer
+- API-level auth flows (signup, login, duplicate email, wrong password) and ownership enforcement over HTTP
 
 ## Status
 
-Core functionality is complete: multi-user auth, ownership-scoped storage, concurrent scheduling, persistence, alerting, and a REST API. A frontend and additional hardening (CORS, expanded test coverage for auth/notifier packages) are planned next.
+Backend is feature-complete: multi-user auth, ownership-scoped storage, concurrent scheduling, persistence, alerting, CORS, and full test coverage across all packages. A frontend is planned next.
