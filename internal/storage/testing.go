@@ -10,7 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func newTestStorage(t *testing.T) *PostgresStorage {
+func NewTestStorage(t *testing.T) *PostgresStorage {
 	t.Helper()
 
 	baseURL := os.Getenv("TEST_DATABASE_URL")

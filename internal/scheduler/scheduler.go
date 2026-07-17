@@ -38,6 +38,10 @@ func New(store storage.Storage, chk *checker.Checker, notif notifier.Notifier, w
 	}
 }
 
+func (s *Scheduler) SetRootContext(ctx context.Context) {
+	s.rootCtx = ctx
+}
+
 func (s *Scheduler) Run(ctx context.Context, monitors []models.Monitor) {
 	s.rootCtx = ctx
 

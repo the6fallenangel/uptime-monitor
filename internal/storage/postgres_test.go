@@ -25,7 +25,7 @@ func createTestUser(t *testing.T, store *PostgresStorage) models.User {
 }
 
 func TestCreateAndGetMonitor(t *testing.T) {
-	store := newTestStorage(t)
+	store := NewTestStorage(t)
 	ctx := context.Background()
 
 	user := createTestUser(t, store)
@@ -52,7 +52,7 @@ func TestCreateAndGetMonitor(t *testing.T) {
 }
 
 func TestListMonitors(t *testing.T) {
-	store := newTestStorage(t)
+	store := NewTestStorage(t)
 	ctx := context.Background()
 
 	user := createTestUser(t, store)
@@ -69,7 +69,7 @@ func TestListMonitors(t *testing.T) {
 }
 
 func TestDeleteMonitor(t *testing.T) {
-	store := newTestStorage(t)
+	store := NewTestStorage(t)
 	ctx := context.Background()
 
 	user := createTestUser(t, store)
@@ -84,7 +84,7 @@ func TestDeleteMonitor(t *testing.T) {
 }
 
 func TestDeleteMonitorNotFound(t *testing.T) {
-	store := newTestStorage(t)
+	store := NewTestStorage(t)
 	ctx := context.Background()
 
 	user := createTestUser(t, store)
@@ -94,7 +94,7 @@ func TestDeleteMonitorNotFound(t *testing.T) {
 }
 
 func TestSaveAndListChecks(t *testing.T) {
-	store := newTestStorage(t)
+	store := NewTestStorage(t)
 	ctx := context.Background()
 
 	user := createTestUser(t, store)
@@ -130,7 +130,7 @@ func TestSaveAndListChecks(t *testing.T) {
 }
 
 func TestDeleteMonitorCascadesChecks(t *testing.T) {
-	store := newTestStorage(t)
+	store := NewTestStorage(t)
 	ctx := context.Background()
 
 	user := createTestUser(t, store)
@@ -153,7 +153,7 @@ func TestDeleteMonitorCascadesChecks(t *testing.T) {
 }
 
 func TestGetMonitorForUserRejectsOtherUsersMonitor(t *testing.T) {
-	store := newTestStorage(t)
+	store := NewTestStorage(t)
 	ctx := context.Background()
 
 	owner := createTestUser(t, store)
@@ -167,7 +167,7 @@ func TestGetMonitorForUserRejectsOtherUsersMonitor(t *testing.T) {
 }
 
 func TestDeleteMonitorForUserRejectsOtherUsersMonitor(t *testing.T) {
-	store := newTestStorage(t)
+	store := NewTestStorage(t)
 	ctx := context.Background()
 
 	owner := createTestUser(t, store)
@@ -185,7 +185,7 @@ func TestDeleteMonitorForUserRejectsOtherUsersMonitor(t *testing.T) {
 }
 
 func TestListMonitorsForUserExcludesOtherUsersMonitors(t *testing.T) {
-	store := newTestStorage(t)
+	store := NewTestStorage(t)
 	ctx := context.Background()
 
 	userA := createTestUser(t, store)
