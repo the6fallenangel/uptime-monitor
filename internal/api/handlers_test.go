@@ -139,7 +139,7 @@ func TestUserCannotAccessAnotherUsersMonitor(t *testing.T) {
 
 	var created map[string]any
 	json.NewDecoder(createRec.Body).Decode(&created)
-	monitorID := int64(created["ID"].(float64))
+	monitorID := int64(created["id"].(float64))
 
 	getReq := httptest.NewRequest(http.MethodGet, "/monitors/"+jsonInt(monitorID), nil)
 	getReq.AddCookie(cookieB)
