@@ -24,11 +24,12 @@ func NewTokenIssuer(secret string, ttl time.Duration) *TokenIssuer {
 }
 
 func (i *TokenIssuer) Issue(userID int64) (string, error) {
+	now := time.Now()
 	claims := Claims{
 		UserID: userID,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(i.ttl)),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			ExpiresAt: jwt.NewNumericDate(now.Add(i.ttl)),
+			IssuedAt:  jwt.NewNumericDate(now),
 		},
 	}
 
@@ -40,10 +41,20 @@ func (i *TokenIssuer) Verify(tokenString string) (int64, error) {
 	claims := &Claims{}
 
 	token, err := jwt.ParseWithClaims(tokenString, claims, func(t *jwt.Token) (any, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, ErrInvalidToken
+		}
+
+		if t.Method.Alg() != jwt.SigningMethodHS256.Alg() {
+			return nil, ErrInvalidToken
+		}
+
 		return i.secret, nil
 	})
+
 	if err != nil || !token.Valid {
 		return 0, ErrInvalidToken
 	}
+
 	return claims.UserID, nil
 }

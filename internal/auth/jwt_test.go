@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -26,7 +27,15 @@ func TestVerifyRejectsTamperedToken(t *testing.T) {
 	issuer := NewTokenIssuer("test-secret", time.Hour)
 
 	token, _ := issuer.Issue(42)
-	tampered := token[:len(token)-1] + "x" // flip the last character
+
+	parts := strings.Split(token, ".")
+	if len(parts) != 3 {
+		t.Fatal("invalid jwt")
+	}
+
+	parts[2] = "invalid-signature"
+
+	tampered := strings.Join(parts, ".")
 
 	if _, err := issuer.Verify(tampered); err == nil {
 		t.Errorf("expected error verifying tampered token, got nil")
