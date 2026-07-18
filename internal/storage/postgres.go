@@ -133,7 +133,7 @@ func (s *PostgresStorage) queryMonitors(ctx context.Context, whereOrderClause st
 	}
 	defer rows.Close()
 
-	var monitors []models.Monitor
+	monitors := make([]models.Monitor, 0)
 	for rows.Next() {
 		var m models.Monitor
 		var intervalSeconds int
@@ -201,7 +201,7 @@ func (s *PostgresStorage) ListChecks(ctx context.Context, monitorID int64, limit
 	}
 	defer rows.Close()
 
-	var checks []models.Check
+	checks := make([]models.Check, 0)
 	for rows.Next() {
 		var c models.Check
 		var responseTimeMs int64
