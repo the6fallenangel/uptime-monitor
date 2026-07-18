@@ -82,6 +82,28 @@ func (s *PostgresStorage) CreateUser(ctx context.Context, u models.User) (models
 	return u, nil
 }
 
+func (s *PostgresStorage) UpdateUserName(ctx context.Context, userID int64, name string) (models.User, error) {
+	tag, err := s.pool.Exec(ctx, `UPDATE users SET name = $1 WHERE id = $2`, name, userID)
+	if err != nil {
+		return models.User{}, fmt.Errorf("updating user name: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return models.User{}, fmt.Errorf("user not found")
+	}
+	return s.GetUserByID(ctx, userID)
+}
+
+func (s *PostgresStorage) UpdateUserPassword(ctx context.Context, userID int64, newPasswordHash string) error {
+	tag, err := s.pool.Exec(ctx, `UPDATE users SET password_hash = $1 WHERE id = $2`, newPasswordHash, userID)
+	if err != nil {
+		return fmt.Errorf("updating password: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("user not found")
+	}
+	return nil
+}
+
 func (s *PostgresStorage) GetUserByEmail(ctx context.Context, email string) (models.User, error) {
 	var u models.User
 	row := s.pool.QueryRow(ctx, `SELECT id, name, email, password_hash, created_at FROM users WHERE email = $1`, email)

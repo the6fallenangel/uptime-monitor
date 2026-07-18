@@ -118,6 +118,86 @@ func handleLogout(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+type updateNameRequest struct {
+	Name string `json:"name"`
+}
+
+func handleUpdateName(store storage.Storage) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := userIDFromContext(r.Context())
+		if !ok {
+			writeError(w, http.StatusUnauthorized, errString("not authenticated"))
+			return
+		}
+
+		var req updateNameRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, err)
+			return
+		}
+		if req.Name == "" {
+			writeError(w, http.StatusBadRequest, errString("name is required"))
+			return
+		}
+
+		updated, err := store.UpdateUserName(r.Context(), userID, req.Name)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err)
+			return
+		}
+
+		writeJSON(w, http.StatusOK, map[string]any{"id": updated.ID, "name": updated.Name, "email": updated.Email})
+	}
+}
+
+type changePasswordRequest struct {
+	CurrentPassword string `json:"currentPassword"`
+	NewPassword     string `json:"newPassword"`
+}
+
+func handleChangePassword(store storage.Storage) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := userIDFromContext(r.Context())
+		if !ok {
+			writeError(w, http.StatusUnauthorized, errString("not authenticated"))
+			return
+		}
+
+		var req changePasswordRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, err)
+			return
+		}
+		if len(req.NewPassword) < 8 {
+			writeError(w, http.StatusBadRequest, errString("new password must be at least 8 characters"))
+			return
+		}
+
+		user, err := store.GetUserByID(r.Context(), userID)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err)
+			return
+		}
+		if !user.CheckPassword(req.CurrentPassword) {
+			writeError(w, http.StatusUnauthorized, errString("current password is incorrect"))
+			return
+		}
+
+		hashed, err := models.NewUser(user.Name, user.Email, req.NewPassword)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err)
+			return
+		}
+
+		if err := store.UpdateUserPassword(r.Context(), userID, hashed.PasswordHash); err != nil {
+			writeError(w, http.StatusInternalServerError, err)
+			return
+		}
+
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
 func issueSessionCookie(w http.ResponseWriter, issuer *auth.TokenIssuer, userID int64, isProduction bool) {
 	token, err := issuer.Issue(userID)
 	if err != nil {

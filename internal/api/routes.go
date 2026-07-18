@@ -13,6 +13,8 @@ func RegisterRoutes(mux *http.ServeMux, store storage.Storage, sched *scheduler.
 	mux.HandleFunc("POST /login", handleLogin(store, issuer, isProduction))
 	mux.HandleFunc("POST /logout", handleLogout)
 	mux.Handle("GET /me", requireAuth(issuer, handleMe(store, issuer)))
+	mux.Handle("PATCH /me/name", requireAuth(issuer, handleUpdateName(store)))
+	mux.Handle("POST /me/password", requireAuth(issuer, handleChangePassword(store)))
 
 	mux.Handle("POST /monitors", requireAuth(issuer, handleCreateMonitor(store, sched)))
 	mux.Handle("PATCH /monitors/{id}", requireAuth(issuer, handleUpdateMonitor(store, sched)))

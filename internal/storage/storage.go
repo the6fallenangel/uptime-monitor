@@ -12,6 +12,8 @@ var ErrMonitorNotFound = errors.New("monitor not found")
 
 type Storage interface {
 	CreateUser(ctx context.Context, user models.User) (models.User, error)
+	UpdateUserName(ctx context.Context, userID int64, name string) (models.User, error)
+	UpdateUserPassword(ctx context.Context, userID int64, newPasswordHash string) error
 	GetUserByEmail(ctx context.Context, email string) (models.User, error)
 	GetUserByID(ctx context.Context, id int64) (models.User, error)
 
