@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"sync"
 	"time"
@@ -124,6 +125,13 @@ func (s *Scheduler) runCheck(ctx context.Context, monitor models.Monitor) {
 	check := s.checker.Check(ctx, monitor)
 
 	if _, err := s.store.SaveCheck(ctx, check); err != nil {
+		if errors.Is(err, storage.ErrMonitorNotFound) {
+			slog.Warn("monitor no longer exists, stopping its scheduler",
+				"monitor_id", monitor.ID,
+			)
+			s.Remove(monitor.ID)
+			return
+		}
 		slog.Error("failed to save check result",
 			"monitor_id", monitor.ID,
 			"url", monitor.URL,

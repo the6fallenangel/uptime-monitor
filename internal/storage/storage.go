@@ -2,9 +2,12 @@ package storage
 
 import (
 	"context"
+	"errors"
 
 	"github.com/the6fallenangel/uptime-monitor/internal/models"
 )
+
+var ErrMonitorNotFound = errors.New("monitor not found")
 
 type Storage interface {
 	CreateUser(ctx context.Context, user models.User) (models.User, error)

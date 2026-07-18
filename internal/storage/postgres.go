@@ -2,9 +2,11 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/the6fallenangel/uptime-monitor/internal/models"
 )
@@ -185,6 +187,10 @@ func (s *PostgresStorage) SaveCheck(ctx context.Context, c models.Check) (models
 	)
 
 	if err := row.Scan(&c.ID); err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23503" {
+			return models.Check{}, ErrMonitorNotFound
+		}
 		return models.Check{}, fmt.Errorf("inserting check: %w", err)
 	}
 	return c, nil
