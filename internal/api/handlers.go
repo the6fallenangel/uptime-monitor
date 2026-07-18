@@ -188,7 +188,15 @@ func handleListChecks(store storage.Storage) http.HandlerFunc {
 			return
 		}
 
-		limit := 50
+		page := 1
+		if p := r.URL.Query().Get("page"); p != "" {
+			parsed, err := strconv.Atoi(p)
+			if err == nil && parsed > 0 {
+				page = parsed
+			}
+		}
+
+		limit := 20
 		if l := r.URL.Query().Get("limit"); l != "" {
 			parsed, err := strconv.Atoi(l)
 			if err == nil && parsed > 0 {
@@ -196,11 +204,26 @@ func handleListChecks(store storage.Storage) http.HandlerFunc {
 			}
 		}
 
-		checks, err := store.ListChecks(r.Context(), id, limit)
+		offset := (page - 1) * limit
+
+		checks, err := store.ListChecks(r.Context(), id, limit, offset)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, err)
 			return
 		}
-		writeJSON(w, http.StatusOK, checks)
+
+		total, err := store.CountChecks(r.Context(), id)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err)
+			return
+		}
+
+		writeJSON(w, http.StatusOK, map[string]any{
+			"checks":     checks,
+			"page":       page,
+			"limit":      limit,
+			"total":      total,
+			"totalPages": (total + limit - 1) / limit,
+		})
 	}
 }

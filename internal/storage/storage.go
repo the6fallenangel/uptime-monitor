@@ -24,5 +24,6 @@ type Storage interface {
 	DeleteMonitorForUser(ctx context.Context, id int64, userID int64) error
 
 	SaveCheck(ctx context.Context, check models.Check) (models.Check, error)
-	ListChecks(ctx context.Context, monitorID int64, limit int) ([]models.Check, error)
+	ListChecks(ctx context.Context, monitorID int64, limit, offset int) ([]models.Check, error)
+	CountChecks(ctx context.Context, monitorID int64) (int, error)
 }

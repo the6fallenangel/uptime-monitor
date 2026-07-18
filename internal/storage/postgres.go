@@ -233,11 +233,11 @@ func (s *PostgresStorage) SaveCheck(ctx context.Context, c models.Check) (models
 	return c, nil
 }
 
-func (s *PostgresStorage) ListChecks(ctx context.Context, monitorID int64, limit int) ([]models.Check, error) {
+func (s *PostgresStorage) ListChecks(ctx context.Context, monitorID int64, limit, offset int) ([]models.Check, error) {
 	rows, err := s.pool.Query(ctx,
 		`SELECT id, monitor_id, status, status_code, response_time_ms, error, checked_at
-		 FROM checks WHERE monitor_id = $1 ORDER BY checked_at DESC LIMIT $2`,
-		monitorID, limit,
+		 FROM checks WHERE monitor_id = $1 ORDER BY checked_at DESC LIMIT $2 OFFSET $3`,
+		monitorID, limit, offset,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("querying checks: %w", err)
@@ -260,4 +260,15 @@ func (s *PostgresStorage) ListChecks(ctx context.Context, monitorID int64, limit
 		return nil, fmt.Errorf("iterating check rows: %w", err)
 	}
 	return checks, nil
+}
+
+func (s *PostgresStorage) CountChecks(ctx context.Context, monitorID int64) (int, error) {
+	var count int
+	err := s.pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM checks WHERE monitor_id = $1`, monitorID,
+	).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("counting checks: %w", err)
+	}
+	return count, nil
 }

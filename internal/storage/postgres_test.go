@@ -117,7 +117,7 @@ func TestSaveAndListChecks(t *testing.T) {
 		t.Errorf("expected non-zero check id")
 	}
 
-	checks, err := store.ListChecks(ctx, monitor.ID, 10)
+	checks, err := store.ListChecks(ctx, monitor.ID, 10, 0)
 	if err != nil {
 		t.Fatalf("unexpected error listing checks: %v", err)
 	}
@@ -143,7 +143,7 @@ func TestDeleteMonitorCascadesChecks(t *testing.T) {
 
 	store.DeleteMonitorForUser(ctx, monitor.ID, user.ID)
 
-	checks, err := store.ListChecks(ctx, monitor.ID, 10)
+	checks, err := store.ListChecks(ctx, monitor.ID, 10, 0)
 	if err != nil {
 		t.Fatalf("unexpected error listing checks: %v", err)
 	}
