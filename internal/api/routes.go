@@ -15,6 +15,7 @@ func RegisterRoutes(mux *http.ServeMux, store storage.Storage, sched *scheduler.
 	mux.Handle("GET /me", requireAuth(issuer, handleMe(store, issuer)))
 
 	mux.Handle("POST /monitors", requireAuth(issuer, handleCreateMonitor(store, sched)))
+	mux.Handle("PATCH /monitors/{id}", requireAuth(issuer, handleUpdateMonitor(store, sched)))
 	mux.Handle("GET /monitors", requireAuth(issuer, handleListMonitorsForUser(store)))
 	mux.Handle("GET /monitors/{id}", requireAuth(issuer, handleGetMonitorForUser(store)))
 	mux.Handle("DELETE /monitors/{id}", requireAuth(issuer, handleDeleteMonitorForUser(store, sched)))

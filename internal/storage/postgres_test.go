@@ -205,3 +205,38 @@ func TestListMonitorsForUserExcludesOtherUsersMonitors(t *testing.T) {
 		t.Errorf("expected user A's monitor list to only contain their own monitor, got %q", monitorsForA[0].Name)
 	}
 }
+
+func TestUpdateMonitor(t *testing.T) {
+	store := NewTestStorage(t)
+	ctx := context.Background()
+
+	user := createTestUser(t, store)
+	saved, _ := store.CreateMonitor(ctx, models.NewMonitor(user.ID, "Original", "https://example.com", 30*time.Second))
+
+	updated, err := store.UpdateMonitor(ctx, saved.ID, user.ID, "Renamed", 5*time.Minute)
+	if err != nil {
+		t.Fatalf("unexpected error updating monitor: %v", err)
+	}
+	if updated.Name != "Renamed" {
+		t.Errorf("expected name %q, got %q", "Renamed", updated.Name)
+	}
+	if updated.Interval != 5*time.Minute {
+		t.Errorf("expected interval 5m, got %v", updated.Interval)
+	}
+	if updated.URL != "https://example.com" {
+		t.Errorf("expected url to remain unchanged, got %q", updated.URL)
+	}
+}
+
+func TestUpdateMonitorRejectsOtherUsersMonitor(t *testing.T) {
+	store := NewTestStorage(t)
+	ctx := context.Background()
+
+	owner := createTestUser(t, store)
+	otherUser := createTestUser(t, store)
+	saved, _ := store.CreateMonitor(ctx, models.NewMonitor(owner.ID, "Private", "https://example.com", time.Minute))
+
+	if _, err := store.UpdateMonitor(ctx, saved.ID, otherUser.ID, "Hijacked", time.Minute); err == nil {
+		t.Errorf("expected error updating another user's monitor, got nil")
+	}
+}

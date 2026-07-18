@@ -72,6 +72,11 @@ func (s *Scheduler) Add(monitor models.Monitor) {
 	go s.scheduleMonitor(monitorCtx, monitor)
 }
 
+func (s *Scheduler) Update(monitor models.Monitor) {
+	s.Remove(monitor.ID)
+	s.Add(monitor)
+}
+
 func (s *Scheduler) Remove(monitorID int64) {
 	s.mu.Lock()
 	cancel, ok := s.cancels[monitorID]

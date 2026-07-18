@@ -117,6 +117,21 @@ func (s *PostgresStorage) CreateMonitor(ctx context.Context, m models.Monitor) (
 	return m, nil
 }
 
+func (s *PostgresStorage) UpdateMonitor(ctx context.Context, id, userID int64, name string, interval time.Duration) (models.Monitor, error) {
+	tag, err := s.pool.Exec(ctx,
+		`UPDATE monitors SET name = $1, interval_seconds = $2 WHERE id = $3 AND user_id = $4`,
+		name, int(interval.Seconds()), id, userID,
+	)
+	if err != nil {
+		return models.Monitor{}, fmt.Errorf("updating monitor: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return models.Monitor{}, fmt.Errorf("monitor not found")
+	}
+
+	return s.GetMonitorForUser(ctx, id, userID)
+}
+
 func (s *PostgresStorage) ListMonitorsForUser(ctx context.Context, userID int64) ([]models.Monitor, error) {
 	return s.queryMonitors(ctx, "WHERE user_id = $1 ORDER BY id", userID)
 }
